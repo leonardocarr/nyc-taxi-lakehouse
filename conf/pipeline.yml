@@ -1,0 +1,122 @@
+# =============================================================================
+# Configuracao unica do pipeline. Nenhum caminho/nome de tabela deve estar
+# hardcoded no codigo -- tudo vem daqui.
+#
+# Perfis:
+#   databricks -> Unity Catalog, 3 niveis (catalog.schema.table)
+#   local      -> metastore local do Spark, 2 niveis (schema.table)
+# =============================================================================
+
+profile: local          # sobrescreva com --profile na CLI ou NYC_TAXI_PROFILE
+
+profiles:
+
+  databricks:
+    catalog: nyc_taxi              # catalogo Unity Catalog
+    warehouse_dir: null            # gerenciado pelo UC
+    schemas:
+      bronze: bronze
+      silver: silver
+      gold: gold
+    source:
+      # 'volume'  -> arquivos ja carregados em um UC Volume (recomendado no Free Edition,
+      #              que bloqueia saida para internet nao confiavel)
+      # 'samples' -> tabela samples.nyctaxi.trips (fallback sem download)
+      # 'http'    -> baixa direto do CloudFront da TLC (workspaces com internet liberada)
+      mode: volume
+      volume_path: /Volumes/nyc_taxi/bronze/landing
+      zones_path: /Volumes/nyc_taxi/bronze/landing/taxi_zone_lookup.csv
+
+  local:
+    catalog: null                  # sem UC: nomes de 2 niveis
+    warehouse_dir: ./lakehouse     # onde o Delta e gravado no disco
+    schemas:
+      bronze: bronze
+      silver: silver
+      gold: gold
+    source:
+      mode: http
+      volume_path: ./data/landing
+      zones_path: ./data/landing/taxi_zone_lookup.csv
+
+# -----------------------------------------------------------------------------
+# Janela de carga. O pipeline e idempotente: rodar de novo o mesmo mes
+# sobrescreve apenas as particoes daquele mes (replaceWhere).
+# -----------------------------------------------------------------------------
+ingestion:
+  service: yellow                  # yellow | green
+  months:                          # formato YYYY-MM
+    - "2024-01"
+    - "2024-02"
+    - "2024-03"
+  base_url: https://d37ci6vzurychx.cloudfront.net/trip-data
+  zones_url: https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv
+
+# -----------------------------------------------------------------------------
+# Regras de negocio da camada silver. Linhas que violam qualquer regra vao para
+# a tabela de quarentena com o motivo da rejeicao -- nao sao descartadas.
+# -----------------------------------------------------------------------------
+silver:
+  rules:
+    - name: pickup_not_null
+      expression: "pickup_datetime IS NOT NULL AND dropoff_datetime IS NOT NULL"
+    - name: chronological_order
+      expression: "dropoff_datetime > pickup_datetime"
+    - name: duration_within_bounds
+      expression: "trip_duration_min BETWEEN 1 AND 360"
+    - name: distance_positive
+      expression: "trip_distance_mi > 0 AND trip_distance_mi < 200"
+    - name: fare_non_negative
+      expression: "fare_amount >= 0 AND total_amount >= 0"
+    - name: passenger_count_plausible
+      expression: "passenger_count IS NULL OR passenger_count BETWEEN 0 AND 9"
+    - name: pickup_within_declared_month
+      expression: "date_format(pickup_datetime, 'yyyy-MM') = load_month"
+    - name: location_ids_valid
+      expression: "pu_location_id BETWEEN 1 AND 265 AND do_location_id BETWEEN 1 AND 265"
+
+# -----------------------------------------------------------------------------
+# Expectativas verificadas DEPOIS da escrita de cada camada. Severidade:
+#   fail -> aborta o job
+#   warn -> registra na tabela de metricas e segue
+# -----------------------------------------------------------------------------
+expectations:
+  silver.fct_source_trips:
+    - name: no_duplicate_trip_ids
+      severity: fail
+      query: "SELECT count(*) FROM (SELECT trip_id FROM {table} GROUP BY trip_id HAVING count(*) > 1)"
+      expect: "== 0"
+    - name: surrogate_keys_not_null
+      severity: fail
+      query: "SELECT count(*) FROM {table} WHERE trip_id IS NULL"
+      expect: "== 0"
+  gold.fct_trips:
+    - name: no_orphan_location_keys
+      severity: fail
+      query: >
+        SELECT count(*) FROM {catalog_prefix}gold.fct_trips f
+        LEFT ANTI JOIN {catalog_prefix}gold.dim_location d
+          ON f.pickup_location_key = d.location_key
+      expect: "== 0"
+    - name: tip_ratio_within_bounds
+      severity: warn
+      query: "SELECT count(*) FROM {table} WHERE tip_pct > 1.0"
+      expect: "== 0"
+    - name: fact_matches_silver_rowcount
+      severity: fail
+      query: >
+        SELECT abs(
+          (SELECT count(*) FROM {catalog_prefix}gold.fct_trips) -
+          (SELECT count(*) FROM {catalog_prefix}silver.fct_source_trips)
+        )
+      expect: "== 0"
+
+# -----------------------------------------------------------------------------
+# Otimizacoes Delta aplicadas ao final de cada camada.
+# -----------------------------------------------------------------------------
+optimize:
+  enabled: true
+  zorder:
+    silver.fct_source_trips: [pu_location_id, pickup_datetime]
+    gold.fct_trips: [pickup_date_key, pickup_location_key]
+  vacuum_retention_hours: 168

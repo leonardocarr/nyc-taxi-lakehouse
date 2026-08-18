@@ -1,0 +1,81 @@
+# Job do pipeline: uma task por camada, encadeadas por dependencia.
+#
+# Separar em tres tasks (em vez de um notebook gigante) da:
+#   - retry seletivo: se gold falha, nao se reingere bronze
+#   - tempo de execucao por camada no historico do job
+#   - a possibilidade de rodar so silver+gold apos mudar uma regra
+#
+# Compute serverless: e o unico disponivel no Databricks Free Edition.
+
+resources:
+  jobs:
+    nyc_taxi_pipeline:
+      name: "[${bundle.target}] NYC Taxi - pipeline medalhao"
+      description: ELT bronze/silver/gold sobre os dados publicos da NYC TLC.
+
+      tags:
+        projeto: nyc-taxi-lakehouse
+        camada: medalhao
+
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"   # 06:00 UTC, diariamente
+        timezone_id: America/Sao_Paulo
+        pause_status: PAUSED                    # ative quando quiser agendar
+
+      email_notifications:
+        on_failure:
+          - ${workspace.current_user.userName}
+
+      queue:
+        enabled: true
+
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: months
+          default: ${var.months}
+
+      tasks:
+        - task_key: bronze
+          description: Ingestao crua dos parquets da TLC + lookup de zonas
+          spark_python_task:
+            python_file: ../src/nyc_taxi/run.py
+            parameters:
+              - "--layer=bronze"
+              - "--profile=databricks"
+              - "--months"
+              - "{{job.parameters.months}}"
+          environment_key: default
+
+        - task_key: silver
+          depends_on:
+            - task_key: bronze
+          description: Conformacao, deduplicacao, validacao e quarentena
+          spark_python_task:
+            python_file: ../src/nyc_taxi/run.py
+            parameters:
+              - "--layer=silver"
+              - "--profile=databricks"
+              - "--months"
+              - "{{job.parameters.months}}"
+          environment_key: default
+
+        - task_key: gold
+          depends_on:
+            - task_key: silver
+          description: Modelo dimensional (fato + dimensoes) e expectativas finais
+          spark_python_task:
+            python_file: ../src/nyc_taxi/run.py
+            parameters:
+              - "--layer=gold"
+              - "--profile=databricks"
+              - "--months"
+              - "{{job.parameters.months}}"
+          environment_key: default
+
+      environments:
+        - environment_key: default
+          spec:
+            client: "2"
+            dependencies:
+              - PyYAML>=6.0

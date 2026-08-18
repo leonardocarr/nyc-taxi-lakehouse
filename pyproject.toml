@@ -1,0 +1,20 @@
+[project]
+name = "nyc-taxi-lakehouse"
+version = "0.1.0"
+description = "Pipeline ELT medalhao (bronze/silver/gold) em PySpark + Delta Lake sobre os dados publicos da NYC TLC"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

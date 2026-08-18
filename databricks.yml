@@ -1,0 +1,41 @@
+# Databricks Asset Bundle -- infraestrutura como codigo.
+#
+#   databricks bundle validate -t dev
+#   databricks bundle deploy   -t dev
+#   databricks bundle run nyc_taxi_pipeline -t dev
+#
+# O bundle e o que separa "eu rodei uns notebooks" de "eu entreguei um pipeline".
+
+bundle:
+  name: nyc-taxi-lakehouse
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Catalogo Unity Catalog de destino
+    default: nyc_taxi
+  months:
+    description: Meses a processar, separados por espaco
+    default: "2024-01 2024-02 2024-03"
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: ${workspace.host}
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog: nyc_taxi_dev
+
+  prod:
+    mode: production
+    workspace:
+      root_path: /Shared/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog: nyc_taxi
+    permissions:
+      - level: CAN_VIEW
+        group_name: users
