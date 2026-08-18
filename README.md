@@ -1,5 +1,12 @@
 # NYC Taxi Lakehouse — pipeline ELT com arquitetura medalhão
 
+## Painel analítico
+
+![Painel analítico do NYC Taxi Lakehouse](docs/dashboard-preview.png)
+
+Painel gerado a partir da camada gold (janeiro/2024). Versão interativa, com
+tooltips e tema claro/escuro: [`docs/dashboard.html`](docs/dashboard.html).
+
 Pipeline ELT em **PySpark + Delta Lake** sobre os dados públicos de corridas de
 táxi de Nova York, com arquitetura medalhão (bronze/silver/gold) e modelagem
 dimensional para consumo analítico. Roda no **Databricks** e, com o mesmo código,
