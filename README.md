@@ -5,7 +5,7 @@ táxi de Nova York, com arquitetura medalhão (bronze/silver/gold) e modelagem
 dimensional para consumo analítico. Roda no **Databricks** e, com o mesmo código,
 localmente — o que torna a suíte de testes possível.
 
-[![CI](https://github.com/SEU-USUARIO/nyc-taxi-lakehouse/actions/workflows/ci.yml/badge.svg)](../../actions)
+[![CI](https://github.com/leonardocarr/nyc-taxi-lakehouse/actions/workflows/ci.yml/badge.svg)](../../actions)
 
 ```mermaid
 flowchart LR
