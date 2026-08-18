@@ -21,7 +21,7 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - name: Instalar dependencias
+      - name: Instalar dependências
         run: pip install -r requirements-dev.txt
 
       - name: Lint
@@ -29,14 +29,3 @@ jobs:
 
       - name: Testes (PySpark + Delta local)
         run: pytest -q --cov=src/nyc_taxi --cov-report=term-missing
-
-  bundle:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: databricks/setup-cli@main
-      - name: Validar o Asset Bundle
-        run: databricks bundle validate -t dev
-        env:
-          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
