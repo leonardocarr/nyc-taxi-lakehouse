@@ -81,7 +81,7 @@ def ingest_trips(spark: SparkSession, cfg: Config, month: str) -> int:
         raw = spark.read.parquet(_trips_path(cfg, month))
 
     df: DataFrame = (
-        raw.withColumn("_source_file", F.input_file_name())
+        raw.withColumn("_source_file", F.col("_metadata.file_path"))
         .withColumn("_ingested_at", F.current_timestamp())
         .withColumn("_batch_id", F.lit(batch_id))
         .withColumn("load_month", F.lit(month))
