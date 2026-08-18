@@ -35,7 +35,7 @@ Roadmap de evolução e critérios de pronto por fase: [`docs/roadmap.md`](docs/
 ## Quickstart
 
 ```bash
-git clone https://github.com/SEU-USUARIO/nyc-taxi-lakehouse.git
+git clone https://github.com/leonardocarr/nyc-taxi-lakehouse.git
 cd nyc-taxi-lakehouse
 
 make install                                    # venv + dependências
