@@ -91,7 +91,7 @@ expectations:
       severity: fail
       query: "SELECT count(*) FROM {table} WHERE trip_id IS NULL"
       expect: "== 0"
-  gold.fct_trips:
+  gold.fct_trips: 
     - name: no_orphan_location_keys
       severity: fail
       query: >
