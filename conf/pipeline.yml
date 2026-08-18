@@ -49,6 +49,7 @@ ingestion:
     - "2024-01"
     - "2024-02"
     - "2024-03"
+    - "2024-04"
   base_url: https://d37ci6vzurychx.cloudfront.net/trip-data
   zones_url: https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv
 
